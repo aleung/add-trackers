@@ -1,29 +1,33 @@
 #!/bin/bash
-# Original script from -> https://github.com/oilervoss/transmission
+# Original script from -> https://github.com/Jorman/Scripts
+# Modified to support MacOS
+
+# Need to install:
+# brew install coreutils gnu-sed transmission-cli
 
 ########## CONFIGURATIONS ##########
 # Access Information for Transmission
 t_username=
 t_password=
 # Host on which transmission runs
-t_host=localhost
+t_host=192.168.0.1
 # Port
 t_port=9091
 # Configure here your private trackers
-private_tracker_list='jumbohostpro,connecting,torrentbytes,shareisland,hdtorrents,girotorrent,bigtower,arabafenice,alpharatio,netcosmo,torrentleech,tleechreload,milkie'
+private_tracker_list=
 # Configure here your trackers list
-live_trackers_list_url='https://newtrackon.com/api/stable'
+live_trackers_list_url='https://cdn.jsdelivr.net/gh/ngosang/trackerslist/trackers_all.txt'
 ########## CONFIGURATIONS ##########
 
-trackers_list_file=~/TorrentTrackersList
+trackers_list_file=/tmp/TorrentTrackersList
 transmission_remote="$(command -v transmission-remote)"
-transmission_default_access="$t_host:$t_port -n=$t_username:$t_password"
+transmission_default_access="$t_host:$t_port"
 auto_tor_grab=0
 test_in_progress=0
 applytheforce=0
 
 if [[ -z $transmission_remote ]]; then
-  echo -e "\n\e[0;91;1mFail on transmission-remote. Aborting.\n\e[0m"
+  echo -e "\n\033[0;91;1mFail on transmission-remote. Aborting.\n\033[0m"
   echo "Please install transmission-remote."
   exit 1
 fi
@@ -104,12 +108,12 @@ inject_trackers () {
   start=1
   while read tracker; do
     if [ -n "$tracker" ]; then
-      echo -ne "\e[0;36;1m$start/$number_of_trackers_in_list - Adding tracker $tracker\e[0;36m"
+      echo -ne "\033[0;36;1m$start/$number_of_trackers_in_list - Adding tracker $tracker\033[0;36m"
       $transmission_remote $transmission_default_access -t $1 --tracker-add $tracker 1>/dev/null 2>&1
       if [ $? -eq 0 ]; then
-        echo -e " -> \e[32mSuccess! "
+        echo -e " -> \033[32mSuccess! "
       else
-        echo -e " - \e[31m< Failed > "
+        echo -e " - \033[31m< Failed > "
       fi
     fi
     start=$((start+1))
@@ -124,8 +128,8 @@ generate_trackers_list () {
     days="1"
 
     # collect both times in seconds-since-the-epoch
-    days_ago=$(date -d "now -$days days" +%s)
-    file_time=$(date -r "$trackers_list_file" +%s)
+    days_ago=$(gdate -d "now -$days days" +%s)
+    file_time=$(gdate -r "$trackers_list_file" +%s)
 
     if (( $file_time <= $days_ago )); then
       echo "File $trackers_list_file exists and is older than $days day, I'll upgrade it"
@@ -172,20 +176,20 @@ elif [ $auto_tor_grab -eq 0 ]; then # manual run
   torrents_list=$($transmission_remote $transmission_default_access -l 2>/dev/null)
 
   if [ $? -ne 0 ]; then
-    echo -e "\n\e[0;91;1mFail on Transmission. Aborting.\n\e[0m"
+    echo -e "\n\033[0;91;1mFail on Transmission. Aborting.\n\033[0m"
     exit 1
   fi
 
   if [ $# -eq 0 ]; then
-    echo -e "\n\e[31mThis script expects one or more parameters\e[0m"
-    echo -e "\e[0;36m${0##*/} \t\t\t- list current torrents "
+    echo -e "\n\033[31mThis script expects one or more parameters\033[0m"
+    echo -e "\033[0;36m${0##*/} \t\t\t- list current torrents "
     echo -e "${0##*/} \$n1 \$n2...\t- add trackers to torrent of number \$n1 and \$n2"
     echo -e "${0##*/} \$s1 \$s2...\t- add trackers to first torrent with part of name \$s1 and \$s2"
     echo -e "${0##*/} .\t\t- add trackers to all torrents"
     echo -e "Names are case insensitive "
-    echo -e "\n\e[0;32;1mCurrent torrents:\e[0;32m"
+    echo -e "\n\033[0;32;1mCurrent torrents:\033[0;32m"
     echo "$torrents_list" | sed -nr 's:(^.{6}).{64}:\1:p'
-    echo -e "\e[0m"
+    echo -e "\033[0m"
     exit 1
   fi
 
@@ -216,14 +220,14 @@ elif [ $auto_tor_grab -eq 0 ]; then # manual run
         tor_trackers_array+=("$tor_trackers_list")
       done <<< "$torrent_found"
 
-      echo -e "\n\e[0;32;1mI found the following torrent:\e[0;32m"
+      echo -e "\n\033[0;32;1mI found the following torrent:\033[0;32m"
       for jj in "${!tor_name_array[@]}"; do
         echo "${tor_name_array[$jj]}"
       done
 
     else
-      echo -e "\n\e[0;31;1mI didn't find a torrent with the text/number: \e[21m$1"
-      echo -e "\e[0m"
+      echo -e "\n\033[0;31;1mI didn't find a torrent with the text/number: \033[21m$1"
+      echo -e "\033[0m"
       shift
       continue
     fi
@@ -233,21 +237,21 @@ elif [ $auto_tor_grab -eq 0 ]; then # manual run
   if [ ${#tor_name_array[@]} -gt 0 ]; then
     for i in "${!tor_name_array[@]}"; do
       private_check=0
-      echo -ne "\n\e[0;1;4;32mFor the Torrent: \e[0;4;32m"
+      echo -ne "\n\033[0;1;4;32mFor the Torrent: \033[0;4;32m"
       echo "${tor_name_array[$i]}"
 
       if [ -n "$private_tracker_list" ] && [ $applytheforce -eq 0 ]; then #private tracker list present, need some more check
-        echo -e "\e[0m\e[33mPrivate tracker list present, checking if the torrent is private\e[0m"
+        echo -e "\033[0m\033[33mPrivate tracker list present, checking if the torrent is private\033[0m"
         for j in ${private_tracker_list//,/ }; do
           if [[ "${tor_trackers_array[$i]}" =~ ${j,,} ]];then
-            echo -e "\e[31m< Private tracker found \e[0m\e[33m-> $j <- \e[0m\e[31mI'll not add any extra tracker >\e[0m"
+            echo -e "\033[31m< Private tracker found \033[0m\033[33m-> $j <- \033[0m\033[31mI'll not add any extra tracker >\033[0m"
             private_check=1
             break #if just one is found, stop the loop
           fi
         done
 
         if [ $private_check -eq 0 ]; then
-          echo -e "\e[0m\e[33mThe torrent is not private, I'll inject trackers on it\e[0m"
+          echo -e "\033[0m\033[33mThe torrent is not private, I'll inject trackers on it\033[0m"
           generate_trackers_list
           inject_trackers ${tor_hash_array[$i]}
         fi
@@ -255,7 +259,7 @@ elif [ $auto_tor_grab -eq 0 ]; then # manual run
         if [ $applytheforce -eq 1 ]; then
           echo "Applytheforce active, I'll inject trackers anyway"
         else
-          echo -e "\e[0m\e[33mPrivate tracker list not present, proceding like usual\e[0m"
+          echo -e "\033[0m\033[33mPrivate tracker list not present, proceding like usual\033[0m"
         fi
         generate_trackers_list
         inject_trackers ${tor_hash_array[$i]}
@@ -282,18 +286,18 @@ else # auto_tor_grab active, so radarr or sonarr
   fi
 
   if [ -n "$private_tracker_list" ]; then #private tracker list present, need some more check
-    echo -e "\e[0m\e[33mPrivate tracker list present, checking if the torrent is private\e[0m"
+    echo -e "\033[0m\033[33mPrivate tracker list present, checking if the torrent is private\033[0m"
     tor_trackers_list=$($transmission_remote $transmission_default_access -t $hash -i | sed -nr 's/ *Magnet: ?(.*)/\1/p')
 
     for j in ${private_tracker_list//,/ }; do
       if [[ "$tor_trackers_list" =~ ${j,,} ]];then
-        echo -e "\e[31m< Private tracker found \e[0m\e[33m-> $j <- \e[0m\e[31mI'll not add any extra tracker >\e[0m"
+        echo -e "\033[31m< Private tracker found \033[0m\033[33m-> $j <- \033[0m\033[31mI'll not add any extra tracker >\033[0m"
         exit
       fi
     done
     echo "Torrent is not private I'll inject trackers"
   else
-    echo -e "\e[0m\e[33mPrivate tracker list not present, proceding like usual\e[0m"
+    echo -e "\033[0m\033[33mPrivate tracker list not present, proceding like usual\033[0m"
   fi
   generate_trackers_list
   inject_trackers $hash
